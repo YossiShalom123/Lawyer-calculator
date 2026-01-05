@@ -10,25 +10,34 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Heebo', sans-serif; transition: background 0.4s ease; min-height: 100vh; margin: 0; }
+        body { 
+            font-family: 'Heebo', sans-serif; 
+            transition: background 0.4s ease; 
+            min-height: 100vh; 
+            margin: 0;
+            overflow-y: auto !important;
+        }
         .dark-mode { background-color: #0f172a; color: white; }
         .light-mode { background-color: #f1f5f9; color: #1e293b; }
+        
         @media (min-width: 1024px) {
-            body { overflow: hidden; height: 100vh; }
-            .main-container { height: 100vh; display: flex; flex-direction: column; }
-            .scroll-area { max-height: calc(100vh - 480px); overflow-y: auto; }
+            .scroll-area { max-height: 550px; overflow-y: auto; }
         }
-        .scroll-area::-webkit-scrollbar { width: 4px; }
+        
+        .scroll-area::-webkit-scrollbar { width: 5px; }
         .scroll-area::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 10px; }
+        
         .btn-premium { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
         .num-btn { transition: all 0.1s; display: flex; align-items: center; justify-content: center; font-weight: 900; border-radius: 12px; cursor: pointer; }
         .num-btn:active { transform: scale(0.92); }
+        
         .dark-mode .num-btn { background: #1e293b; border: 1px solid #334155; }
         .dark-mode .display-box { background: #020617; border: 2px solid #334155; color: #f59e0b; }
         .dark-mode .bg-custom-card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(51, 65, 85, 0.5); }
+        
         .light-mode .num-btn { background: white; border: 1px solid #cbd5e1; color: #1e293b; }
         .light-mode .display-box { background: white; border: 2px solid #cbd5e1; color: #d97706; }
-        .light-mode .bg-custom-card { background: white; border: 1px solid #cbd5e1; }
+        .light-mode .bg-custom-card { background: white; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body class="p-4 md:p-8 dark-mode" id="mainBody">
@@ -39,13 +48,11 @@
         function App() {
             const [history, setHistory] = useState([]);
             const [gross, setGross] = useState('');
-            const [restoreCode, setRestoreCode] = useState('');
             const [isArchiveOpen, setIsArchiveOpen] = useState(false);
             const [multiCodes, setMultiCodes] = useState('');
             const [copied, setCopied] = useState(false);
             const [isDarkMode, setIsDarkMode] = useState(true);
 
-            // פונקציית החישוב המרכזית - משתמשים ב-useCallback כדי שתהיה זמינה לכולם
             const calculateValue = useCallback((val) => {
                 const n = parseFloat(val);
                 if (isNaN(n) || n <= 0) return { net: 0, deduction: 0 };
@@ -61,7 +68,7 @@
             }, []);
 
             useEffect(() => {
-                document.getElementById('mainBody').className = `p-4 md:px-12 md:py-8 ${isDarkMode ? 'dark-mode' : 'light-mode'}`;
+                document.getElementById('mainBody').className = `p-4 md:p-8 ${isDarkMode ? 'dark-mode' : 'light-mode'}`;
             }, [isDarkMode]);
 
             const onAdd = (valueToAdd = null) => {
@@ -74,117 +81,131 @@
 
             const fmt = (num) => new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(num);
 
-            // לוגיקת הארכיון והסיכום המתוקנת
-            const combinedNet = useMemo(() => {
-                let total = 0;
-                if (!multiCodes.trim()) return 0;
+            const totalNet = history.reduce((s, i) => s + i.net, 0);
+            const totalDeductions = history.reduce((s, i) => s + i.deduction, 0);
+
+            // חישוב משולב לארכיון: גם נטו וגם קיזוזים
+            const combinedTotals = useMemo(() => {
+                let net = 0;
+                let deduction = 0;
+                if (!multiCodes.trim()) return { net, deduction };
                 
-                // פיצול לפי רווחים או שורות חדשות
-                const codes = multiCodes.split(/[\s\n]+/);
-                
-                codes.forEach(code => {
-                    if (!code.trim()) return;
+                multiCodes.split(/[\s\n]+/).forEach(code => {
                     try {
                         const decoded = JSON.parse(atob(code.trim()));
                         if (Array.isArray(decoded)) {
-                            decoded.forEach(val => {
-                                total += calculateValue(val).net;
+                            decoded.forEach(val => { 
+                                const res = calculateValue(val);
+                                net += res.net;
+                                deduction += res.deduction;
                             });
                         }
-                    } catch (e) {
-                        console.error("שגיאה בפענוח קוד:", code);
-                    }
+                    } catch (e) {}
                 });
-                return total;
+                return { net, deduction };
             }, [multiCodes, calculateValue]);
 
-            const totalNet = history.reduce((s, i) => s + i.net, 0);
-
             return (
-                <div className="max-w-7xl mx-auto main-container">
-                    <header className="flex justify-between items-center mb-6">
+                <div className="max-w-6xl mx-auto pb-20">
+                    <header className="flex justify-between items-center mb-8 border-b border-slate-700/50 pb-4">
                         <div className="text-right">
-                            <h1 className="text-2xl md:text-4xl font-black">מערכת חישוב שכר</h1>
-                            <p className="text-amber-500 font-bold text-sm">לשכת עורכי הדין בישראל</p>
+                            <h1 className="text-3xl font-black tracking-tight">מערכת חישוב שכר</h1>
+                            <p className="text-amber-500 font-bold text-sm tracking-widest uppercase">לשכת עורכי הדין בישראל</p>
                         </div>
-                        <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-3 bg-slate-800 rounded-full border border-slate-700">
+                        <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-3 bg-slate-800 rounded-full border border-slate-700 shadow-lg">
                             {isDarkMode ? '🌞' : '🌙'}
                         </button>
                     </header>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:overflow-hidden">
-                        <div className="lg:col-span-5 space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="space-y-6">
                             <div className="bg-custom-card p-6 rounded-3xl shadow-xl">
-                                <div className="display-box p-4 rounded-2xl text-4xl md:text-5xl font-black text-center mb-6 h-24 flex items-center justify-center shadow-inner">
+                                <div className="display-box p-4 rounded-2xl text-5xl font-black text-center mb-6 h-24 flex items-center justify-center shadow-inner">
                                     {gross || '0'}
                                 </div>
                                 <div className="grid grid-cols-3 gap-3">
                                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => <button key={n} onClick={() => setGross(prev => prev + n)} className="num-btn h-16 md:h-20 text-2xl">{n}</button>)}
-                                    <button onClick={() => setGross('')} className="num-btn bg-slate-700 text-white h-16 text-xl">C</button>
+                                    <button onClick={() => setGross('')} className="num-btn bg-slate-700 text-white h-16 text-xl font-bold">C</button>
                                     <button onClick={() => setGross(prev => prev + '0')} className="num-btn h-16 text-2xl">0</button>
                                     <button onClick={() => setGross(prev => prev.slice(0, -1))} className="num-btn bg-slate-700 text-white h-16 text-xl">⌫</button>
                                     <button onClick={() => onAdd()} className="col-span-3 btn-premium text-slate-950 font-black py-5 rounded-xl text-2xl mt-4 active:scale-95 shadow-lg">הוסף לרשימה +</button>
                                 </div>
                             </div>
-                            <div className="bg-slate-800 p-6 rounded-3xl border-t-4 border-amber-500 shadow-xl text-white">
-                                <span className="text-slate-400 block text-[10px] font-black uppercase text-right">סה"כ נטו ברשימה:</span>
-                                <div className="text-4xl md:text-5xl font-black text-right">{fmt(totalNet)}</div>
+                            
+                            <div className="bg-slate-800 p-8 rounded-3xl border-r-8 border-amber-500 shadow-xl space-y-4">
+                                <div>
+                                    <span className="text-slate-400 block text-xs font-black uppercase text-right mb-1 tracking-widest tracking-tight">סה"כ נטו ברשימה:</span>
+                                    <div className="text-5xl font-black text-right text-white">{fmt(totalNet)}</div>
+                                </div>
+                                <div className="pt-4 border-t border-slate-700">
+                                    <span className="text-red-400 block text-[10px] font-black uppercase text-right mb-1 tracking-widest">סה"כ קיזוזים (20%):</span>
+                                    <div className="text-2xl font-black text-right text-red-500">{fmt(totalDeductions)}</div>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="lg:col-span-7 flex flex-col">
-                            <div className="flex justify-between items-center mb-4 px-2">
+                        <div className="flex flex-col">
+                            <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest">פירוט עסקאות ({history.length})</h2>
                                 <div className="flex gap-2">
                                     <button onClick={() => { 
                                         const code = btoa(JSON.stringify(history.map(i => i.gross)));
                                         navigator.clipboard.writeText(code);
-                                        setCopied(true);
-                                        setTimeout(() => setCopied(false), 2000);
-                                    }} className="text-[10px] bg-slate-700 text-white px-3 py-1 rounded-full font-bold">
-                                        {copied ? '✅ הועתק' : '📋 העתק קוד רשימה'}
+                                        setCopied(true); setTimeout(() => setCopied(false), 2000);
+                                    }} className="text-[10px] bg-emerald-600 text-white px-4 py-2 rounded-full font-bold shadow-md uppercase transition-all active:scale-90">
+                                        {copied ? '✅ הועתק' : '📋 העתק קוד'}
                                     </button>
-                                    <button onClick={() => setHistory([])} className="text-[10px] text-red-500 border border-red-500/30 px-3 py-1 rounded-full font-bold">נקה</button>
+                                    <button onClick={() => setHistory([])} className="text-[10px] text-red-500 border border-red-500/30 px-4 py-2 rounded-full font-bold transition-all hover:bg-red-500/10 uppercase">נקה</button>
                                 </div>
                             </div>
-                            <div className="scroll-area space-y-3 pb-10 px-1">
+                            
+                            <div className="scroll-area space-y-3">
                                 {history.map((item, idx) => (
-                                    <div key={item.id} className="bg-custom-card p-4 rounded-2xl flex justify-between items-center shadow-md border border-slate-700/20">
+                                    <div key={item.id} className="bg-custom-card p-5 rounded-2xl flex justify-between items-center shadow-lg border border-slate-700/20 hover:border-amber-500/50 transition-all">
                                         <div className="text-right">
-                                            <p className="font-bold text-lg mb-1">{fmt(item.gross)}</p>
-                                            <p className="text-[10px] text-red-400 font-bold uppercase tracking-tight">ניכוי: {fmt(item.deduction)}</p>
+                                            <p className="font-black text-xl mb-1">{fmt(item.gross)}</p>
+                                            <p className="text-[10px] text-red-400 font-bold uppercase">ניכוי: {fmt(item.deduction)}</p>
                                         </div>
                                         <div className="text-left font-black text-2xl text-emerald-500">+{fmt(item.net)}</div>
                                     </div>
                                 ))}
+                                {history.length === 0 && <div className="text-center py-20 opacity-20 font-bold italic">הרשימה ריקה...</div>}
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-auto pt-6 border-t border-slate-800/50 pb-8">
-                        <button onClick={() => setIsArchiveOpen(!isArchiveOpen)} className="w-full bg-slate-800/40 p-4 rounded-2xl flex justify-between items-center mb-4 border border-slate-700/30">
-                            <span className="font-bold text-slate-400 text-xs uppercase tracking-widest">📂 ארכיון וסיכום (הדבק כאן קודים)</span>
+                    <div className="mt-12">
+                        <button onClick={() => setIsArchiveOpen(!isArchiveOpen)} className="w-full bg-slate-800/40 p-5 rounded-2xl flex justify-between items-center border border-slate-700/30 hover:bg-slate-800 transition-all">
+                            <span className="font-bold text-slate-400 text-sm uppercase tracking-widest flex items-center gap-2">📂 ארכיון וסיכום רב-רשימות</span>
                             <span className="text-slate-400">{isArchiveOpen ? '▲' : '▼'}</span>
                         </button>
+                        
                         {isArchiveOpen && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-900/50 p-4 rounded-2xl mb-4 border border-slate-800">
+                            <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-900/50 p-6 rounded-3xl border border-slate-800 shadow-2xl">
                                 <textarea 
                                     value={multiCodes} 
                                     onChange={(e) => setMultiCodes(e.target.value)} 
-                                    className="w-full h-32 bg-slate-950 border border-slate-700 rounded-xl p-3 text-[10px] text-emerald-400 font-mono outline-none resize-none text-left" 
-                                    placeholder="הדבק כאן את הקודים שהעתקת (אחד מתחת לשני)..." 
+                                    className="w-full h-48 bg-slate-950 border border-slate-700 rounded-2xl p-4 text-[11px] text-emerald-400 font-mono outline-none resize-none shadow-inner text-left" 
+                                    placeholder="הדבק כאן את הקודים שהעתקת (כל קוד בשורה חדשה)..." 
                                 />
-                                <div className="flex flex-col justify-center text-right p-6 bg-slate-800/50 rounded-xl border border-slate-700">
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">נטו משולב מכל הקודים:</span>
-                                    <div className="text-4xl font-black text-emerald-400 mt-2">{fmt(combinedNet)}</div>
-                                    <button onClick={() => setMultiCodes('')} className="text-right text-[10px] text-slate-500 underline mt-4">נקה תיבת ארכיון</button>
+                                <div className="flex flex-col justify-center text-right p-8 bg-slate-800/60 rounded-2xl border border-slate-700 space-y-6">
+                                    <div>
+                                        <span className="text-xs text-slate-400 font-black uppercase tracking-widest mb-1">נטו משולב סופי:</span>
+                                        <div className="text-5xl font-black text-emerald-400 tracking-tighter">{fmt(combinedTotals.net)}</div>
+                                    </div>
+                                    <div className="pt-4 border-t border-slate-700/50">
+                                        <span className="text-[10px] text-red-400 font-black uppercase tracking-widest mb-1">סה"כ קיזוזים משולב:</span>
+                                        <div className="text-2xl font-black text-red-500">{fmt(combinedTotals.deduction)}</div>
+                                    </div>
+                                    <button onClick={() => setMultiCodes('')} className="text-right text-xs text-slate-500 underline hover:text-white transition-colors">נקה תיבת ארכיון</button>
                                 </div>
                             </div>
                         )}
-                        <footer className="text-center">
-                            <div className="text-amber-500 font-black text-[11px] italic">נבנה על ידי יוסי שלום סמנכ"ל לשכת עורכי הדין בישראל</div>
-                        </footer>
                     </div>
+
+                    <footer className="mt-12 text-center opacity-40 hover:opacity-100 transition-opacity">
+                        <div className="text-amber-500 font-black text-xs italic tracking-widest uppercase">נבנה על ידי יוסי שלום סמנכ"ל לשכת עורכי הדין בישראל</div>
+                    </footer>
                 </div>
             );
         }
