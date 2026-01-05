@@ -4,171 +4,203 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מחשבון שכר | לשכת עורכי הדין</title>
-    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
-
     <style>
-        body { background-color: #0f172a; color: white; font-family: 'Heebo', sans-serif; height: 100vh; overflow: hidden; }
-        .scroll-area { max-height: calc(100vh - 280px); overflow-y: auto; }
+        body { 
+            font-family: 'Heebo', sans-serif; 
+            margin: 0; 
+            min-height: 100vh; 
+            background-color: #0f172a; 
+            color: white; 
+            overflow-y: auto; /* מאפשר גלילה חופשית */
+        }
+        .dark-mode { background-color: #0f172a; color: white; }
+        .light-mode { background-color: #f1f5f9; color: #1e293b; }
+        
+        .scroll-area { 
+            max-height: 500px; 
+            overflow-y: auto; 
+            padding: 10px;
+            border-radius: 1rem;
+        }
         .scroll-area::-webkit-scrollbar { width: 4px; }
         .scroll-area::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 10px; }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         
-        .btn-premium {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            box-shadow: 0 4px 15px rgba(217, 119, 6, 0.3);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .btn-premium:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(217, 119, 6, 0.4);
-            filter: brightness(1.1);
-        }
-        .btn-premium:active { transform: translateY(1px) scale(0.98); }
-
-        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-        .item-animate { animation: slideIn 0.3s ease-out forwards; }
+        .btn-premium { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .num-btn { transition: all 0.1s; display: flex; align-items: center; justify-content: center; font-weight: 900; border-radius: 12px; cursor: pointer; }
+        .num-btn:active { transform: scale(0.9); }
+        
+        .dark-mode .num-btn { background: #1e293b; border: 1px solid #334155; }
+        .dark-mode .display-box { background: #020617; border: 2px solid #334155; color: #f59e0b; }
+        .light-mode .num-btn { background: white; border: 1px solid #cbd5e1; color: #1e293b; }
+        .light-mode .display-box { background: white; border: 2px solid #cbd5e1; color: #d97706; }
+        
+        .settings-panel { animation: slideIn 0.2s ease-out; z-index: 100; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body class="p-6 md:p-10">
+<body>
     <div id="root"></div>
-
     <script type="text/babel">
-        const { useState, useMemo } = React;
+        const { useState, useEffect, useCallback } = React;
 
         function App() {
-            const [gross, setGross] = useState('');
             const [history, setHistory] = useState([]);
+            const [lastDeleted, setLastDeleted] = useState(null);
+            const [gross, setGross] = useState('');
+            const [isDarkMode, setIsDarkMode] = useState(true);
+            const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+            const [magicAmounts, setMagicAmounts] = useState([10000, 15000, 20000, 30000]);
+            const [editingIndex, setEditingIndex] = useState(null);
+            const [editInput, setEditInput] = useState('');
 
             const calculateValue = (val) => {
                 const n = parseFloat(val);
                 if (isNaN(n) || n <= 0) return { net: 0, deduction: 0 };
-                
                 let net, deduction;
-                if (n === 15000 || n === 20000) {
-                    net = (n - 8000) * 0.8;
-                    deduction = (n - 8000) * 0.2;
-                } else {
-                    net = n * 0.8;
-                    deduction = n * 0.2;
+                if (n === 15000 || n === 20000) { 
+                    net = (n - 8000) * 0.8; 
+                    deduction = (n - 8000) * 0.2; 
+                } else { 
+                    net = n * 0.8; 
+                    deduction = n * 0.2; 
                 }
                 return { net, deduction };
             };
 
-            const current = useMemo(() => calculateValue(gross), [gross]);
+            const onAdd = useCallback((valStr = null) => {
+                const finalStr = valStr !== null ? valStr.toString() : gross;
+                const n = parseFloat(finalStr);
+                if (isNaN(n) || n <= 0) return;
+                const v = calculateValue(n);
+                setHistory(prev => [{ id: Math.random(), gross: n, ...v }, ...prev]);
+                if (valStr === null) setGross('');
+            }, [gross]);
 
-            const onAdd = () => {
-                if (!gross) return;
-                setHistory([{ 
-                    id: Date.now(), 
-                    gross: parseFloat(gross), 
-                    net: current.net,
-                    deduction: current.deduction 
-                }, ...history]);
-                setGross('');
-            };
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                    const key = e.key.toLowerCase();
+                    if (key === 'ט' || key === 'y') onAdd(magicAmounts[0]);
+                    if (key === 'ו' || key === 'u') onAdd(magicAmounts[1]);
+                    if (key === 'ן' || key === 'i') onAdd(magicAmounts[2]);
+                    if (key === 'ם' || key === 'o') onAdd(magicAmounts[3]);
+                    if (e.key === 'Enter') onAdd();
+                    if (e.key === 'Escape') setGross('');
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [magicAmounts, onAdd]);
 
-            const totalNet = history.reduce((s, i) => s + i.net, 0);
-            const totalDeductions = history.reduce((s, i) => s + i.deduction, 0);
-            const fmt = (n) => new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(n);
+            const fmt = (num) => new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(num);
 
             return (
-                <div className="max-w-7xl mx-auto h-full flex flex-col">
-                    <header className="mb-8 border-b border-slate-700 pb-4">
-                        <h1 className="text-3xl font-black tracking-tight text-white text-center md:text-right">מערכת חישוב שכר</h1>
-                        <p className="text-amber-500 text-sm font-bold text-center md:text-right">לשכת עורכי הדין בישראל</p>
-                    </header>
-
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-10 flex-1 overflow-hidden">
-                        <div className="md:col-span-5 space-y-6">
-                            <div className="bg-slate-800/40 p-8 rounded-3xl border border-slate-700 shadow-2xl backdrop-blur-sm">
-                                <label className="block text-slate-400 mb-4 font-bold text-sm uppercase">הכנס ברוטו (₪):</label>
-                                <input 
-                                    type="number"
-                                    autoFocus
-                                    value={gross}
-                                    onChange={(e) => setGross(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && onAdd()}
-                                    className="w-full bg-slate-950 border-2 border-slate-700 p-6 rounded-2xl text-5xl font-black text-center outline-none focus:border-amber-500 transition-all shadow-inner"
-                                    placeholder="0"
-                                />
-                                <div className="mt-6 flex justify-between items-center bg-slate-900/80 p-4 rounded-xl border border-slate-700">
-                                    <span className="text-slate-400 font-bold text-sm">נטו לתוספת:</span>
-                                    <span className="text-2xl font-black text-amber-500">{fmt(current.net)}</span>
+                <div className={`min-h-screen p-4 md:p-8 ${isDarkMode ? 'dark-mode' : 'light-mode'}`}>
+                    <div className="max-w-6xl mx-auto w-full relative">
+                        
+                        {/* הגדרות */}
+                        <div className="absolute left-0 top-0">
+                            <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 text-amber-500">
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                            </button>
+                            {isSettingsOpen && (
+                                <div className={`settings-panel absolute left-0 mt-2 w-64 p-4 rounded-2xl shadow-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                    <div className="space-y-4">
+                                        <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full text-xs font-bold py-2 bg-amber-500/10 text-amber-500 rounded">החלף מצב יום/לילה</button>
+                                        <div className="space-y-1">
+                                            <span className="text-[10px] font-black text-amber-500">עריכת מקשי קסם (ט, ו, ן, ם)</span>
+                                            {magicAmounts.map((amt, idx) => (
+                                                <div key={idx} className="flex items-center gap-2 bg-black/20 p-2 rounded">
+                                                    <span className="text-xs font-bold opacity-50">{['ט','ו','ן','ם'][idx]}</span>
+                                                    {editingIndex === idx ? (
+                                                        <input autoFocus className="flex-1 bg-black text-white text-xs p-1 rounded border border-amber-500" value={editInput} 
+                                                            onChange={(e)=>setEditInput(e.target.value)}
+                                                            onBlur={()=>{
+                                                                if(editInput){const n=[...magicAmounts]; n[idx]=parseInt(editInput); setMagicAmounts(n);}
+                                                                setEditingIndex(null);
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <div className="flex flex-1 justify-between items-center px-1">
+                                                            <span className="text-xs font-bold">{amt.toLocaleString()}</span>
+                                                            <button onClick={()=>{setEditingIndex(idx); setEditInput(amt.toString());}} className="text-[10px] text-amber-500">ערוך</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button onClick={() => {if(lastDeleted) setHistory(lastDeleted); setLastDeleted(null);}} disabled={!lastDeleted} className={`w-full text-xs py-2 rounded font-bold ${!lastDeleted ? 'opacity-20' : 'bg-emerald-600/20 text-emerald-500'}`}>שחזר מחיקה</button>
+                                    </div>
                                 </div>
-                                <button onClick={onAdd} className="w-full btn-premium text-slate-950 font-black py-5 rounded-2xl mt-6 text-xl">
-                                    הוסף לרשימה +
-                                </button>
-                            </div>
-
-                            <div className="bg-slate-800 p-8 rounded-3xl border-t-4 border-amber-500 shadow-2xl space-y-6">
-                                <div>
-                                    <span className="text-slate-400 block text-xs font-black uppercase mb-2 tracking-widest">סה"כ לתשלום (נטו מצטבר):</span>
-                                    <div className="text-6xl font-black text-white tracking-tighter">{fmt(totalNet)}</div>
-                                </div>
-                                <div className="pt-6 border-t border-slate-700 flex justify-between items-center">
-                                    <span className="text-red-400 font-bold text-xs uppercase tracking-tighter">סך הכל ניכויים וקיזוזים:</span>
-                                    <span className="text-2xl font-black text-red-500/90">{fmt(totalDeductions)}</span>
-                                </div>
-                            </div>
+                            )}
                         </div>
 
-                        <div className="md:col-span-7 flex flex-col overflow-hidden">
-                            <div className="flex justify-between items-center mb-6 px-2">
-                                <h2 className="text-lg font-black uppercase tracking-tight text-slate-300">פירוט נתונים:</h2>
-                                <div className="flex items-center gap-4">
-                                    <button 
-                                        onClick={() => setHistory(history.slice(1))} 
-                                        className="flex items-center gap-2 text-slate-400 hover:text-white text-xs font-bold transition-colors bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"
-                                    >
-                                        <span>↩</span> בטל אחרון
-                                    </button>
-                                    <button 
-                                        onClick={() => window.confirm("האם למחוק את כל הנתונים?") && setHistory([])} 
-                                        className="flex items-center gap-2 text-red-400/70 hover:text-red-400 text-xs font-bold transition-colors"
-                                    >
-                                        <span>⚠️</span> איפוס רשימה
-                                    </button>
+                        <header className="mb-8 border-b border-slate-700/50 pb-4 text-right">
+                            <h1 className="text-3xl font-black">מערכת חישוב שכר</h1>
+                            <p className="text-amber-500 font-bold tracking-tight text-sm">לשכת עורכי הדין בישראל</p>
+                        </header>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                            {/* מחשבון */}
+                            <div className="lg:col-span-5 space-y-6">
+                                <div className={`p-6 rounded-3xl border border-slate-700/50 shadow-2xl ${isDarkMode ? 'bg-slate-800/40' : 'bg-white'}`}>
+                                    <div className="display-box p-4 rounded-2xl text-5xl font-black text-center mb-6 h-24 flex items-center justify-center shadow-inner">
+                                        {gross || '0'}
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => <button key={n} onClick={() => setGross(prev => prev + n)} className="num-btn h-16 text-2xl">{n}</button>)}
+                                        <button onClick={() => setGross('')} className="num-btn bg-slate-700 text-white h-16 text-xl">C</button>
+                                        <button onClick={() => setGross(prev => prev + '0')} className="num-btn h-16 text-2xl">0</button>
+                                        <button onClick={() => setGross(prev => prev.slice(0, -1))} className="num-btn bg-slate-700 text-white h-16 text-xl">⌫</button>
+                                        <button onClick={() => onAdd()} className="col-span-3 btn-premium text-slate-900 font-black py-5 rounded-xl text-2xl mt-4 shadow-lg active:scale-95 transition-transform">הוסף לרשימה +</button>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-800 p-8 rounded-3xl border-t-4 border-amber-500 shadow-2xl text-right">
+                                    <span className="text-slate-400 block text-xs font-black uppercase tracking-widest mb-1">סה"כ נטו ברשימה:</span>
+                                    <div className="text-5xl font-black text-amber-500 mb-2">{fmt(history.reduce((s,i)=>s+i.net,0))}</div>
+                                    <div className="text-sm text-slate-400 font-bold">סך ניכויים: {fmt(history.reduce((s,i)=>s+i.deduction,0))}</div>
                                 </div>
                             </div>
-                            
-                            <div className="scroll-area space-y-3 pr-2">
-                                {history.length === 0 ? (
-                                    <div className="h-40 flex items-center justify-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold italic">
-                                        ממתין להזנת נתונים...
-                                    </div>
-                                ) : (
-                                    history.map((item, idx) => (
-                                        <div key={item.id} className="bg-slate-800/40 border border-slate-700 p-5 rounded-2xl flex justify-between items-center hover:bg-slate-800/60 transition-all item-animate">
+
+                            {/* רשימה */}
+                            <div className="lg:col-span-7 pb-20">
+                                <div className="flex justify-between items-center mb-6">
+                                    <button onClick={() => {if(confirm("לאפס?")){setLastDeleted([...history]); setHistory([]);}}} className="text-xs text-red-500 border border-red-500/30 px-5 py-2 rounded-full hover:bg-red-500 hover:text-white transition-all">⚠️ איפוס רשימה</button>
+                                    <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest">פירוט עסקאות</h2>
+                                </div>
+                                <div className="scroll-area space-y-4">
+                                    {history.map((item, idx) => (
+                                        <div key={item.id} className="bg-slate-800/40 p-5 rounded-2xl flex justify-between items-center border border-slate-700/20 shadow-md">
                                             <div className="flex items-center gap-5">
-                                                <div className="bg-amber-500/10 text-amber-500 w-10 h-10 flex items-center justify-center rounded-xl font-black border border-amber-500/20">
-                                                    {history.length - idx}
-                                                </div>
-                                                <div>
-                                                    <p className="text-white font-black text-lg">{fmt(item.gross)}</p>
-                                                    <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider">ניכוי: {fmt(item.deduction)}</p>
+                                                <div className="bg-amber-500/10 text-amber-500 w-10 h-10 flex items-center justify-center rounded-xl text-sm font-black border border-amber-500/20">{history.length - idx}</div>
+                                                <div className="text-right">
+                                                    <p className="font-black text-xl leading-tight">{fmt(item.gross)}</p>
+                                                    <p className="text-xs text-red-400 font-bold opacity-80">ניכוי: {fmt(item.deduction)}</p>
                                                 </div>
                                             </div>
-                                            <div className="text-left">
-                                                <div className="text-2xl font-black text-white">+{fmt(item.net)}</div>
+                                            <div className="flex items-center gap-4">
+                                                <button onClick={() => onAdd(item.gross)} className="bg-emerald-600/20 text-emerald-500 w-10 h-10 rounded-xl font-bold hover:bg-emerald-600 hover:text-white transition-all">+</button>
+                                                <button onClick={() => {setLastDeleted([...history]); setHistory(history.filter(h=>h.id!==item.id));}} className="bg-red-600/20 text-red-500 w-10 h-10 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all">-</button>
+                                                <div className="text-left font-black text-2xl mr-4 text-emerald-500 tracking-tighter">+{fmt(item.net)}</div>
                                             </div>
                                         </div>
-                                    ))
-                                )}
+                                    ))}
+                                    {history.length === 0 && (
+                                        <div className="py-20 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold">הרשימה ריקה. השתמש במקשים ט, ו, ן, ם</div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <footer className="mt-auto pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-2">
-                        <div className="text-slate-500 text-xs font-bold">לשכת עורכי הדין בישראל © 2026</div>
-                        <div className="text-amber-500 font-black text-sm italic">
-                            נבנה על ידי יוסי שלום סמנכ"ל לשכת עורכי הדין בישראל
-                        </div>
-                    </footer>
+                        <footer className="py-10 text-center opacity-40 border-t border-slate-800/50">
+                             <div className="text-amber-500 font-black text-xs italic mb-1">נבנה על ידי יוסי שלום סמנכ"ל לשכת עורכי הדין</div>
+                            <div className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">מחשבון שכר מהיר © 2026</div>
+                        </footer>
+                    </div>
                 </div>
             );
         }
