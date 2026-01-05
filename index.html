@@ -10,31 +10,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Heebo', sans-serif; transition: background 0.4s ease; min-height: 100vh; margin:0; }
+        body { font-family: 'Heebo', sans-serif; transition: background 0.4s ease; min-height: 100vh; margin: 0; }
         .dark-mode { background-color: #0f172a; color: white; }
         .light-mode { background-color: #f1f5f9; color: #1e293b; }
-        
-        @media (min-width: 1024px) { 
-            body { overflow: hidden; height: 100vh; } 
-            .scroll-area { max-height: calc(100vh - 450px); overflow-y: auto; } 
+        @media (min-width: 1024px) {
+            body { overflow: hidden; height: 100vh; }
+            .main-container { height: 100vh; display: flex; flex-direction: column; }
+            .scroll-area { max-height: calc(100vh - 480px); overflow-y: auto; }
         }
         .scroll-area::-webkit-scrollbar { width: 4px; }
         .scroll-area::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 10px; }
-        
         .btn-premium { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-        .num-btn { transition: all 0.1s; display: flex; align-items: center; justify-content: center; font-weight: 900; border-radius: 12px; font-size: 1.5rem; cursor: pointer; }
+        .num-btn { transition: all 0.1s; display: flex; align-items: center; justify-content: center; font-weight: 900; border-radius: 12px; cursor: pointer; }
         .num-btn:active { transform: scale(0.92); }
-        
         .dark-mode .num-btn { background: #1e293b; border: 1px solid #334155; }
         .dark-mode .display-box { background: #020617; border: 2px solid #334155; color: #f59e0b; }
         .dark-mode .bg-custom-card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(51, 65, 85, 0.5); }
-        
         .light-mode .num-btn { background: white; border: 1px solid #cbd5e1; color: #1e293b; }
         .light-mode .display-box { background: white; border: 2px solid #cbd5e1; color: #d97706; }
-        .light-mode .bg-custom-card { background: white; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-
-        .settings-panel { transform-origin: top; animation: slideIn 0.2s ease-out; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .light-mode .bg-custom-card { background: white; border: 1px solid #cbd5e1; }
     </style>
 </head>
 <body class="p-4 md:p-8 dark-mode" id="mainBody">
@@ -44,217 +38,153 @@
 
         function App() {
             const [history, setHistory] = useState([]);
-            const [lastDeleted, setLastDeleted] = useState(null);
             const [gross, setGross] = useState('');
             const [restoreCode, setRestoreCode] = useState('');
             const [isArchiveOpen, setIsArchiveOpen] = useState(false);
             const [multiCodes, setMultiCodes] = useState('');
             const [copied, setCopied] = useState(false);
-            
             const [isDarkMode, setIsDarkMode] = useState(true);
-            const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-            // הגדרות סכומי קסם
-            const [magicAmounts, setMagicAmounts] = useState([10000, 15000, 20000, 30000]);
-            const [editingIndex, setEditingIndex] = useState(null);
-            const [editInput, setEditInput] = useState('');
-
-            useEffect(() => {
-                document.getElementById('mainBody').className = isDarkMode ? 'p-4 md:p-8 dark-mode' : 'p-4 md:p-8 light-mode';
-            }, [isDarkMode]);
-
-            const calculateValue = (val) => {
+            // פונקציית החישוב המרכזית - משתמשים ב-useCallback כדי שתהיה זמינה לכולם
+            const calculateValue = useCallback((val) => {
                 const n = parseFloat(val);
                 if (isNaN(n) || n <= 0) return { net: 0, deduction: 0 };
                 let net, deduction;
-                if (n === 15000 || n === 20000) { net = (n - 8000) * 0.8; deduction = (n - 8000) * 0.2; }
-                else { net = n * 0.8; deduction = n * 0.2; }
+                if (n === 15000 || n === 20000) { 
+                    net = (n - 8000) * 0.8; 
+                    deduction = (n - 8000) * 0.2; 
+                } else { 
+                    net = n * 0.8; 
+                    deduction = n * 0.2; 
+                }
                 return { net, deduction };
-            };
+            }, []);
 
-            const onAdd = useCallback((valueToAdd = null) => {
-                const val = valueToAdd !== null ? valueToAdd : gross;
-                const finalGross = parseFloat(val);
+            useEffect(() => {
+                document.getElementById('mainBody').className = `p-4 md:px-12 md:py-8 ${isDarkMode ? 'dark-mode' : 'light-mode'}`;
+            }, [isDarkMode]);
+
+            const onAdd = (valueToAdd = null) => {
+                const finalGross = valueToAdd !== null ? valueToAdd : parseFloat(gross);
                 if (isNaN(finalGross) || finalGross <= 0) return;
                 const v = calculateValue(finalGross);
                 setHistory(prev => [{ id: Math.random(), gross: finalGross, net: v.net, deduction: v.deduction }, ...prev]);
                 if (valueToAdd === null) setGross('');
-            }, [gross]);
-
-            useEffect(() => {
-                const handleKeyDown = (e) => {
-                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-                    const key = e.key.toLowerCase();
-                    if (key === 'q') setGross(magicAmounts[0].toString());
-                    if (key === 'w') setGross(magicAmounts[1].toString());
-                    if (key === 'e') setGross(magicAmounts[2].toString());
-                    if (key === 'r') setGross(magicAmounts[3].toString());
-                    if (key === 'enter') onAdd();
-                    if (key === 'escape') setGross('');
-                };
-                window.addEventListener('keydown', handleKeyDown);
-                return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [magicAmounts, onAdd]);
-
-            const deleteItem = (id) => {
-                const itemToDelete = history.find(i => i.id === id);
-                setLastDeleted({ type: 'single', fullHistory: [...history] });
-                setHistory(history.filter(h => h.id !== id));
-            };
-
-            const undoDelete = () => {
-                if (lastDeleted) {
-                    setHistory(lastDeleted.fullHistory);
-                    setLastDeleted(null);
-                }
             };
 
             const fmt = (num) => new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(num);
+
+            // לוגיקת הארכיון והסיכום המתוקנת
+            const combinedNet = useMemo(() => {
+                let total = 0;
+                if (!multiCodes.trim()) return 0;
+                
+                // פיצול לפי רווחים או שורות חדשות
+                const codes = multiCodes.split(/[\s\n]+/);
+                
+                codes.forEach(code => {
+                    if (!code.trim()) return;
+                    try {
+                        const decoded = JSON.parse(atob(code.trim()));
+                        if (Array.isArray(decoded)) {
+                            decoded.forEach(val => {
+                                total += calculateValue(val).net;
+                            });
+                        }
+                    } catch (e) {
+                        console.error("שגיאה בפענוח קוד:", code);
+                    }
+                });
+                return total;
+            }, [multiCodes, calculateValue]);
+
             const totalNet = history.reduce((s, i) => s + i.net, 0);
-            const totalDeductions = history.reduce((s, i) => s + i.deduction, 0);
 
             return (
-                <div className="max-w-7xl mx-auto flex flex-col h-full relative">
-                    
-                    <div className="absolute left-0 top-0 z-50">
-                        <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 transition-transform hover:scale-110">
-                            <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </button>
-                        
-                        {isSettingsOpen && (
-                            <div className={`settings-panel absolute left-0 mt-2 w-64 p-4 rounded-2xl shadow-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} z-50`}>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center pb-2 border-b border-slate-700/30">
-                                        <span className="text-xs font-bold">מצב יום/לילה</span>
-                                        <button onClick={() => setIsDarkMode(!isDarkMode)} className={`w-10 h-5 rounded-full relative ${isDarkMode ? 'bg-amber-500' : 'bg-slate-300'}`}>
-                                            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isDarkMode ? 'right-1' : 'right-6'}`}></div>
-                                        </button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <span className="text-[10px] font-black text-amber-500 uppercase">סכומי קסם (Q,W,E,R)</span>
-                                        {magicAmounts.map((amt, idx) => (
-                                            <div key={idx} className="flex items-center gap-2 bg-slate-700/20 p-1 rounded">
-                                                <span className="text-[10px] opacity-50 w-3">{['Q','W','E','R'][idx]}</span>
-                                                {editingIndex === idx ? (
-                                                    <input autoFocus className="flex-1 bg-slate-900 text-[10px] p-1 rounded outline-none border border-amber-500" value={editInput} 
-                                                        onChange={(e)=>setEditInput(e.target.value)}
-                                                        onBlur={()=>{
-                                                            if(editInput){const n=[...magicAmounts]; n[idx]=parseInt(editInput); setMagicAmounts(n);}
-                                                            setEditingIndex(null);
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div className="flex flex-1 justify-between items-center">
-                                                        <span className="text-xs font-bold">{amt.toLocaleString()}</span>
-                                                        <button onClick={()=>{setEditingIndex(idx); setEditInput(amt.toString());}} className="text-[9px] text-amber-500">ערוך ✎</button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <button onClick={undoDelete} disabled={!lastDeleted} className={`w-full text-[10px] font-bold py-2 rounded ${!lastDeleted ? 'opacity-20' : 'bg-emerald-600/20 text-emerald-500'}`}>↩ שחזר מחיקה</button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <header className="mb-4 border-b border-slate-700/50 pb-4 flex flex-col lg:flex-row justify-between items-center gap-4">
+                <div className="max-w-7xl mx-auto main-container">
+                    <header className="flex justify-between items-center mb-6">
                         <div className="text-right">
-                            <h1 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>מערכת חישוב שכר</h1>
-                            <p className="text-amber-500 text-sm font-bold">לשכת עורכי הדין בישראל</p>
+                            <h1 className="text-2xl md:text-4xl font-black">מערכת חישוב שכר</h1>
+                            <p className="text-amber-500 font-bold text-sm">לשכת עורכי הדין בישראל</p>
                         </div>
-                        <div className="flex gap-2 bg-slate-800 p-2 rounded-2xl border border-slate-700 shadow-lg">
-                            <input type="text" placeholder="קוד שחזור..." value={restoreCode} onChange={(e) => setRestoreCode(e.target.value)} className="bg-slate-950 border border-slate-600 rounded-xl px-2 py-1 text-[10px] text-white outline-none w-24" />
-                            <button onClick={() => { try { const gs = JSON.parse(atob(restoreCode)); setHistory(gs.map(g => ({ id: Math.random(), gross: g, ...calculateValue(g) }))); setRestoreCode(''); } catch(e){alert('קוד שגוי')} }} className="bg-emerald-600 text-white text-[9px] px-2 py-1 rounded-lg font-bold">שחזר</button>
-                            <button onClick={() => { const code = btoa(JSON.stringify(history.map(i => i.gross))); navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className={`${copied ? 'bg-emerald-500' : 'bg-slate-700'} text-white text-[9px] px-2 py-1 rounded-lg font-bold`}>{copied ? 'הועתק!' : 'העתק קוד'}</button>
-                        </div>
+                        <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-3 bg-slate-800 rounded-full border border-slate-700">
+                            {isDarkMode ? '🌞' : '🌙'}
+                        </button>
                     </header>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 lg:overflow-hidden">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:overflow-hidden">
                         <div className="lg:col-span-5 space-y-4">
-                            <div className="bg-custom-card p-4 rounded-3xl shadow-xl">
-                                <div className="display-box p-4 rounded-2xl text-4xl font-black text-center mb-4 h-20 flex items-center justify-center shadow-inner">
+                            <div className="bg-custom-card p-6 rounded-3xl shadow-xl">
+                                <div className="display-box p-4 rounded-2xl text-4xl md:text-5xl font-black text-center mb-6 h-24 flex items-center justify-center shadow-inner">
                                     {gross || '0'}
                                 </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => <button key={n} onClick={() => setGross(prev => prev + n)} className="num-btn h-14 md:h-16">{n}</button>)}
-                                    <button onClick={() => setGross('')} className="num-btn bg-slate-700 text-white h-14 md:h-16">C</button>
-                                    <button onClick={() => setGross(prev => prev + '0')} className="num-btn h-14 md:h-16">0</button>
-                                    <button onClick={() => setGross(prev => prev.slice(0, -1))} className="num-btn bg-slate-700 text-white h-14 md:h-16">⌫</button>
-                                    <button onClick={() => onAdd()} className="col-span-3 btn-premium text-slate-900 font-black py-4 rounded-xl text-xl mt-2 active:scale-95 shadow-lg">הוסף לרשימה +</button>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => <button key={n} onClick={() => setGross(prev => prev + n)} className="num-btn h-16 md:h-20 text-2xl">{n}</button>)}
+                                    <button onClick={() => setGross('')} className="num-btn bg-slate-700 text-white h-16 text-xl">C</button>
+                                    <button onClick={() => setGross(prev => prev + '0')} className="num-btn h-16 text-2xl">0</button>
+                                    <button onClick={() => setGross(prev => prev.slice(0, -1))} className="num-btn bg-slate-700 text-white h-16 text-xl">⌫</button>
+                                    <button onClick={() => onAdd()} className="col-span-3 btn-premium text-slate-950 font-black py-5 rounded-xl text-2xl mt-4 active:scale-95 shadow-lg">הוסף לרשימה +</button>
                                 </div>
                             </div>
-
-                            <div className="bg-slate-800 p-6 rounded-3xl border-t-4 border-amber-500 shadow-xl">
+                            <div className="bg-slate-800 p-6 rounded-3xl border-t-4 border-amber-500 shadow-xl text-white">
                                 <span className="text-slate-400 block text-[10px] font-black uppercase text-right">סה"כ נטו ברשימה:</span>
-                                <div className={`text-4xl font-black text-right break-words ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{fmt(totalNet)}</div>
-                                <div className="pt-2 border-t border-slate-700/30 mt-2 flex justify-between items-center text-red-500">
-                                    <span className="text-[10px] font-bold">ניכויים וקיזוזים:</span>
-                                    <span className="text-lg font-black">{fmt(totalDeductions)}</span>
-                                </div>
+                                <div className="text-4xl md:text-5xl font-black text-right">{fmt(totalNet)}</div>
                             </div>
                         </div>
 
-                        <div className="lg:col-span-7 flex flex-col h-full">
-                            <div className="flex justify-between items-center mb-3 px-2">
-                                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest text-right">פירוט עסקאות נוכחי</h2>
-                                <button onClick={() => { setLastDeleted({type:'all', data:[...history]}); setHistory([]); }} className="text-[9px] font-bold text-red-500 border border-red-500/30 px-3 py-1 rounded-full">⚠️ איפוס</button>
+                        <div className="lg:col-span-7 flex flex-col">
+                            <div className="flex justify-between items-center mb-4 px-2">
+                                <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest">פירוט עסקאות ({history.length})</h2>
+                                <div className="flex gap-2">
+                                    <button onClick={() => { 
+                                        const code = btoa(JSON.stringify(history.map(i => i.gross)));
+                                        navigator.clipboard.writeText(code);
+                                        setCopied(true);
+                                        setTimeout(() => setCopied(false), 2000);
+                                    }} className="text-[10px] bg-slate-700 text-white px-3 py-1 rounded-full font-bold">
+                                        {copied ? '✅ הועתק' : '📋 העתק קוד רשימה'}
+                                    </button>
+                                    <button onClick={() => setHistory([])} className="text-[10px] text-red-500 border border-red-500/30 px-3 py-1 rounded-full font-bold">נקה</button>
+                                </div>
                             </div>
-                            <div className="scroll-area space-y-2 pb-6 px-1">
+                            <div className="scroll-area space-y-3 pb-10 px-1">
                                 {history.map((item, idx) => (
-                                    <div key={item.id} className="bg-custom-card p-3 rounded-xl flex justify-between items-center text-right shadow-sm border border-slate-700/20">
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-amber-500/10 text-amber-500 w-7 h-7 flex items-center justify-center rounded font-black text-[10px]">{history.length - idx}</div>
-                                            <div className="text-right">
-                                                <p className={`font-bold text-sm mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{fmt(item.gross)}</p>
-                                                <p className="text-[8px] text-red-400 font-bold uppercase tracking-tighter">ניכוי: {fmt(item.deduction)}</p>
-                                            </div>
+                                    <div key={item.id} className="bg-custom-card p-4 rounded-2xl flex justify-between items-center shadow-md border border-slate-700/20">
+                                        <div className="text-right">
+                                            <p className="font-bold text-lg mb-1">{fmt(item.gross)}</p>
+                                            <p className="text-[10px] text-red-400 font-bold uppercase tracking-tight">ניכוי: {fmt(item.deduction)}</p>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => onAdd(item.gross)} className="bg-emerald-600/20 text-emerald-500 w-8 h-8 rounded-lg font-bold">+</button>
-                                            <button onClick={() => deleteItem(item.id)} className="bg-red-600/20 text-red-500 w-8 h-8 rounded-lg font-bold">-</button>
-                                            <div className={`text-left font-black text-lg mr-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>+{fmt(item.net)}</div>
-                                        </div>
+                                        <div className="text-left font-black text-2xl text-emerald-500">+{fmt(item.net)}</div>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-4 mb-2">
-                        <button onClick={() => setIsArchiveOpen(!isArchiveOpen)} className="w-full bg-slate-800/40 border border-slate-700/50 p-3 rounded-xl flex justify-between items-center text-right hover:bg-slate-700/60 transition-all">
-                            <span className="font-bold text-slate-400 text-xs uppercase tracking-widest">📂 ארכיון וסיכום רב-רשימות</span>
-                            <span className="text-slate-500 text-xs">{isArchiveOpen ? '▲' : '▼'}</span>
+                    <div className="mt-auto pt-6 border-t border-slate-800/50 pb-8">
+                        <button onClick={() => setIsArchiveOpen(!isArchiveOpen)} className="w-full bg-slate-800/40 p-4 rounded-2xl flex justify-between items-center mb-4 border border-slate-700/30">
+                            <span className="font-bold text-slate-400 text-xs uppercase tracking-widest">📂 ארכיון וסיכום (הדבק כאן קודים)</span>
+                            <span className="text-slate-400">{isArchiveOpen ? '▲' : '▼'}</span>
                         </button>
                         {isArchiveOpen && (
-                            <div className="mt-2 bg-slate-900 border border-slate-700 p-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-bottom duration-300">
-                                <textarea value={multiCodes} onChange={(e) => setMultiCodes(e.target.value)} className="w-full h-24 bg-slate-950 border border-slate-700 rounded-lg p-2 text-[10px] text-emerald-400 font-mono outline-none resize-none text-right shadow-inner" placeholder="הדבק כאן קודים לסיכום..." />
-                                <div className="bg-slate-800/50 p-4 rounded-lg flex flex-col justify-center gap-2 text-right border border-slate-700">
-                                    <div className="flex justify-between border-b border-slate-700/50 pb-2">
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">נטו משולב כולל:</span>
-                                        <span className="font-black text-emerald-400 text-2xl tracking-tighter">
-                                            {fmt(useMemo(() => {
-                                                let totalN = 0;
-                                                multiCodes.split(/\s+/).forEach(code => {
-                                                    try { JSON.parse(atob(code.trim())).forEach(g => { totalN += calculateValue(g).net; }); } catch (e) {}
-                                                });
-                                                return totalN;
-                                            }, [multiCodes]))}
-                                        </span>
-                                    </div>
-                                    <button onClick={() => setMultiCodes('')} className="mt-1 text-[9px] text-slate-500 underline text-right">נקה מאגר</button>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-900/50 p-4 rounded-2xl mb-4 border border-slate-800">
+                                <textarea 
+                                    value={multiCodes} 
+                                    onChange={(e) => setMultiCodes(e.target.value)} 
+                                    className="w-full h-32 bg-slate-950 border border-slate-700 rounded-xl p-3 text-[10px] text-emerald-400 font-mono outline-none resize-none text-left" 
+                                    placeholder="הדבק כאן את הקודים שהעתקת (אחד מתחת לשני)..." 
+                                />
+                                <div className="flex flex-col justify-center text-right p-6 bg-slate-800/50 rounded-xl border border-slate-700">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">נטו משולב מכל הקודים:</span>
+                                    <div className="text-4xl font-black text-emerald-400 mt-2">{fmt(combinedNet)}</div>
+                                    <button onClick={() => setMultiCodes('')} className="text-right text-[10px] text-slate-500 underline mt-4">נקה תיבת ארכיון</button>
                                 </div>
                             </div>
                         )}
+                        <footer className="text-center">
+                            <div className="text-amber-500 font-black text-[11px] italic">נבנה על ידי יוסי שלום סמנכ"ל לשכת עורכי הדין בישראל</div>
+                        </footer>
                     </div>
-
-                    <footer className="mt-auto pt-4 border-t border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-2 pb-6 opacity-50">
-                        <div className="text-slate-500 text-[9px] font-bold uppercase text-right">לשכת עורכי הדין בישראל © 2026</div>
-                        <div className="text-amber-500 font-black text-[10px] italic text-right">נבנה על ידי יוסי שלום סמנכ"ל לשכת עורכי הדין</div>
-                    </footer>
                 </div>
             );
         }
