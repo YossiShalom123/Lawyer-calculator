@@ -40,8 +40,15 @@
         .light-mode .display-box { background: white; border: 2px solid #cbd5e1; color: #d97706; }
         .light-mode .bg-custom-card { background: white; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
         
-        /* הסרת חיצי מספרים בדפדפן */
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+        .delete-btn {
+            opacity: 0.3;
+            transition: all 0.2s;
+        }
+        .group:hover .delete-btn {
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8 dark-mode" id="mainBody">
@@ -82,8 +89,18 @@
                 
                 const v = calculateValue(valToProcess);
                 setHistory(prev => [{ id: Math.random(), gross: valToProcess, net: v.net, deduction: v.deduction }, ...prev]);
-                setLastValue(valToProcess); // שמירת הסכום האחרון לכפתור "שוב"
+                setLastValue(valToProcess);
                 if (valueToAdd === null) setGross('');
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter') {
+                    onAdd();
+                }
+            };
+
+            const removeEntry = (id) => {
+                setHistory(prev => prev.filter(item => item.id !== id));
             };
 
             const fmt = (num) => new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(num);
@@ -127,6 +144,7 @@
                                     type="number"
                                     value={gross}
                                     onChange={(e) => setGross(e.target.value)}
+                                    onKeyDown={handleKeyDown}
                                     placeholder="0"
                                     className="display-box w-full p-4 rounded-2xl text-5xl font-black text-center mb-6 h-24 flex items-center justify-center shadow-inner outline-none"
                                 />
@@ -166,18 +184,27 @@
                                     }} className="text-[10px] bg-emerald-600 text-white px-4 py-2 rounded-full font-bold shadow-md uppercase transition-all active:scale-90">
                                         {copied ? '✅ הועתק' : '📋 העתק קוד'}
                                     </button>
-                                    <button onClick={() => {setHistory([]); setLastValue(null);}} className="text-[10px] text-red-500 border border-red-500/30 px-4 py-2 rounded-full font-bold transition-all hover:bg-red-500/10 uppercase">נקה</button>
+                                    <button onClick={() => {setHistory([]); setLastValue(null);}} className="text-[10px] text-red-500 border border-red-500/30 px-4 py-2 rounded-full font-bold transition-all hover:bg-red-500/10 uppercase">נקה הכל</button>
                                 </div>
                             </div>
                             
                             <div className="scroll-area space-y-3">
                                 {history.map((item, idx) => (
-                                    <div key={item.id} className="bg-custom-card p-5 rounded-2xl flex justify-between items-center shadow-lg border border-slate-700/20 hover:border-amber-500/50 transition-all">
+                                    <div key={item.id} className="bg-custom-card p-5 rounded-2xl flex justify-between items-center shadow-lg border border-slate-700/20 hover:border-amber-500/50 transition-all group relative">
                                         <div className="text-right">
                                             <p className="font-black text-xl mb-1">{fmt(item.gross)}</p>
                                             <p className="text-[10px] text-red-400 font-bold uppercase">ניכוי: {fmt(item.deduction)}</p>
                                         </div>
-                                        <div className="text-left font-black text-2xl text-emerald-500">+{fmt(item.net)}</div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-left font-black text-2xl text-emerald-500">+{fmt(item.net)}</div>
+                                            <button 
+                                                onClick={() => removeEntry(item.id)}
+                                                className="delete-btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all border border-red-500/20"
+                                                title="מחק עסקה זו"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                                 {history.length === 0 && <div className="text-center py-20 opacity-20 font-bold italic">הרשימה ריקה...</div>}
